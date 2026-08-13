@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>No Cold Start</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    max-width: 640px;
+    margin: 60px auto;
+    padding: 0 20px;
+    background: #0f1115;
+    color: #e6e6e6;
+  }
+  h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 4px; }
+  p.sub { color: #9a9a9a; margin-top: 0; margin-bottom: 32px; }
+  .row { display: flex; gap: 8px; }
+  input[type=text] {
+    flex: 1;
+    padding: 12px 14px;
+    font-size: 1rem;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #1a1d24;
+    color: #e6e6e6;
+  }
+  button {
+    padding: 12px 20px;
+    font-size: 1rem;
+    border-radius: 8px;
+    border: none;
+    background: #4f7dff;
+    color: white;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.secondary {
+    background: transparent;
+    border: 1px solid #444;
+    color: #ccc;
+  }
+  #stopwatch {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.9rem;
+    color: #7fd67f;
+    margin-top: 10px;
+    min-height: 1.2em;
+  }
+  #whisper-card {
+    margin-top: 28px;
+    padding: 20px;
+    border-radius: 10px;
+    background: #1a1d24;
+    border: 1px solid #2a2d34;
+    display: none;
+  }
+  #whisper-text { font-size: 1.1rem; line-height: 1.5; margin-bottom: 14px; }
+  #error { color: #ff8080; margin-top: 14px; display: none; }
+  pre {
+    white-space: pre-wrap;
+    background: #12141a;
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: #b9c4d0;
+    max-height: 320px;
+    overflow: auto;
+  }
+  #why-card { margin-top: 16px; display: none; }
+</style>
+</head>
+<body>
+  <h1>No Cold Start</h1>
+  <p class="sub">Type a name. Get a whisper of what matters right now, spoken out loud — with a "why" you can actually ask.</p>
+
+  <div class="row">
+    <input type="text" id="name-input" placeholder="Frank" autofocus>
+    <button id="go-btn">Whisper</button>
+  </div>
+  <div id="stopwatch"></div>
+  <div id="error"></div>
+
+  <div id="whisper-card">
+    <div id="whisper-text"></div>
+    <audio id="audio" controls></audio>
+    <div class="row" style="margin-top: 14px;">
+      <button class="secondary" id="why-btn">Why did you say that?</button>
+    </div>
+    <div id="why-card">
+      <pre id="why-text"></pre>
+    </div>
+  </div>
+
+  <script>
+    const nameInput = document.getElementById('name-input');
+    const goBtn = document.getElementById('go-btn');
+    const stopwatch = document.getElementById('stopwatch');
+    const errorEl = document.getElementById('error');
+    const whisperCard = document.getElementById('whisper-card');
+    const whisperText = document.getElementById('whisper-text');
+    const audioEl = document.getElementById('audio');
+    const whyBtn = document.getElementById('why-btn');
+    const whyCard = document.getElementById('why-card');
+    const whyText = document.getElementById('why-text');
+
+    let currentDecisionId = null;
+    let timerHandle = null;
+
+    function startStopwatch() {
+      const start = performance.now();
+      stopwatch.textContent = '0.0s';
+      timerHandle = setInterval(() => {
+        stopwatch.textContent = ((performance.now() - start) / 1000).toFixed(1) + 's';
+      }, 50);
+    }
+
+    function stopStopwatch(finalMs) {
+      clearInterval(timerHandle);
+      stopwatch.textContent = `${(finalMs / 1000).toFixed(2)}s (server-measured)`;
+    }
+
+    async function askWhisper() {
+      const name = nameInput.value.trim();
+      if (!name) return;
+
+      errorEl.style.display = 'none';
+      whisperCard.style.display = 'none';
+      whyCard.style.display = 'none';
+      goBtn.disabled = true;
+      startStopwatch();
+
+      try {
+        const res = await fetch(`/api/whisper?name=${encodeURIComponent(name)}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Something went wrong.');
+        }
+
+        stopStopwatch(data.elapsed_ms);
+        whisperText.textContent = `${data.person}: "${data.whisper_text}"`;
+        audioEl.src = `data:audio/mpeg;base64,${data.audio_base64}`;
+        audioEl.play().catch(() => {});
+        currentDecisionId = data.decision_id;
+        whisperCard.style.display = 'block';
+      } catch (err) {
+        clearInterval(timerHandle);
+        errorEl.textContent = err.message;
+        errorEl.style.display = 'block';
+      } finally {
+        goBtn.disabled = false;
+      }
+    }
+
+    async function askWhy() {
+      if (!currentDecisionId) return;
+      const res = await fetch(`/api/decision/${currentDecisionId}`);
+      const data = await res.json();
+      whyText.textContent = JSON.stringify(data, null, 2);
+      whyCard.style.display = 'block';
+    }
+
+    goBtn.addEventListener('click', askWhisper);
+    nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') askWhisper(); });
+    whyBtn.addEventListener('click', askWhy);
+  </script>
+</body>
+</html>

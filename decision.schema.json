@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Decision",
+  "description": "A record of a choice made by the system (or the team that built it): what was chosen, what was rejected, and why.",
+  "type": "object",
+  "required": ["decision_type", "actor", "choice", "reasoning", "facts_touched"],
+  "properties": {
+    "decision_type": { "type": "string", "enum": ["recall_selection", "reconciliation", "architecture"] },
+    "actor": { "type": "string", "description": "Who or what made this decision, e.g. 'encounter_agent:v1'." },
+    "choice": { "type": "string", "description": "What was decided, in plain language." },
+    "alternatives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "option": { "type": "string" },
+          "rejected_because": { "type": "string" }
+        }
+      }
+    },
+    "reasoning": { "type": "string", "description": "Why this choice was made over the alternatives." },
+    "facts_touched": { "type": "array", "description": "IDs of the Facts this decision read or wrote." },
+    "parent_decision_id": { "description": "ID of the Decision this one follows from, if any. Lets a chain of decisions be walked backward." },
+    "timestamp": { "type": "string", "format": "date-time" }
+  }
+}
