@@ -8,6 +8,7 @@ serving one HTML page and two JSON endpoints.
 import base64
 import os
 import time
+from datetime import datetime
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -107,6 +108,19 @@ def whisper():
     )
 
 
+def to_jsonable(value):
+    """Walk a Mongo document and turn ObjectId/datetime into plain strings."""
+    if isinstance(value, ObjectId):
+        return str(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {k: to_jsonable(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [to_jsonable(v) for v in value]
+    return value
+
+
 @app.route("/api/decision/<decision_id>")
 def decision_chain(decision_id):
     try:
@@ -118,24 +132,7 @@ def decision_chain(decision_id):
     if not result:
         return jsonify({"error": "decision not found"}), 404
 
-    def clean(doc):
-        doc = dict(doc)
-        doc["_id"] = str(doc["_id"])
-        for k in ("facts_touched", "parent_decision_id"):
-            if doc.get(k):
-                if isinstance(doc[k], list):
-                    doc[k] = [str(x) for x in doc[k]]
-                else:
-                    doc[k] = str(doc[k])
-        return doc
-
-    result = clean(result)
-    result["decision_chain"] = [clean(d) for d in result.get("decision_chain", [])]
-    result["facts_expanded"] = [
-        {**{k: str(v) if k == "_id" else v for k, v in f.items()}}
-        for f in result.get("facts_expanded", [])
-    ]
-    return jsonify(result)
+    return jsonify(to_jsonable(result))
 
 
 @app.route("/api/architecture-decisions")
@@ -143,9 +140,7 @@ def architecture_decisions():
     """The capstone from the demo script: the system explaining its own build choices."""
     db_ = db.get_db()
     docs = list(db_.decisions.find({"decision_type": "architecture"}))
-    for d in docs:
-        d["_id"] = str(d["_id"])
-    return jsonify(docs)
+    return jsonify(to_jsonable(docs))
 
 
 if __name__ == "__main__":

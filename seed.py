@@ -9,6 +9,10 @@ mess something up live.
 
 from datetime import datetime, timedelta, timezone
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import db
 
 now = datetime.now(timezone.utc)
