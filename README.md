@@ -36,10 +36,10 @@ python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
 cp .env.example .env   # fill in your Atlas connection string and ElevenLabs API key
 ./.venv/bin/python seed.py       # loads sample people, facts, and decisions
-./.venv/bin/python app.py        # starts the app on http://localhost:5000
+./.venv/bin/python app.py        # starts the app on http://127.0.0.1:5000
 ```
 
-Open `http://localhost:5000`, type a seeded name (e.g. "Frank" or
+Open `http://127.0.0.1:5000`, type a seeded name (e.g. "Frank" or
 "Aisha"), and hit Whisper.
 
 ## Layout
